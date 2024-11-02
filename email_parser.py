@@ -130,8 +130,27 @@ for d, b in body_cleaned.items():
 
 print(f'{counter} weeks with issues')
 
-mega_list = [t for t_list in titles for t in t_list]
+#%% Make weights using date
+
+# Unweighted list
+mega_list = [t for t_list in titles.values() for t in t_list]
+
+# Weighted by frequency
+recipes = dict((k, {'count': mega_list.count(k)}) for k in set(mega_list))
+
+# Get most recent date
+min_date = min(titles.keys())
+for r in recipes.keys():
+    date_list = [d for d in titles.keys() if r in titles[d]]
+    max_date = max(date_list)
+    recipes[r]['dates'] = date_list
+    recipes[r]['max'] = max_date
+    recipes[r]['distance'] = (dparser.parse(max_date) - dparser.parse(min_date)).days
 
 #%% Get random meal
 
-random.choices(mega_list, k=10)
+recipe_weights = {k: v['distance'] for k, v in recipes.items()}
+
+random.choices(list(recipe_weights.keys()),
+               weights=list(recipe_weights.values()),
+               k=10)
