@@ -12,6 +12,8 @@ import re
 import random
 import dateutil.parser as dparser
 import datetime as dt
+from bs4 import BeautifulSoup
+import csv
 
 #%% Get list off emails
 
@@ -29,29 +31,44 @@ for i, f in enumerate(onlyfiles):
     with open(fp, 'r') as f:
         msg = email.message_from_file(f)
     
-    body = ""
+    body_html = ""
+    body_txt = ""
+
+    # if not msg.is_multipart():
+    #     print("Not multipart")
     
     if msg.is_multipart():
         for part in msg.walk():
             ctype = part.get_content_type()
             cdispo = str(part.get('Content-Disposition'))
+            # print(ctype)
+            # print(cdispo)
     
             # skip any text/plain (txt) attachments
             if ctype == 'text/plain' and 'attachment' not in cdispo:
-                body = part.get_payload(decode=True)  # decode
-                break
+                body_txt = part.get_payload(decode=True)  # decode
+                # break
+            if ctype == 'text/html' and 'attachment' not in cdispo:
+                body_html = part.get_payload(decode=True)  # decode
+
     # not multipart - i.e. plain text, no attachments, keeping fingers crossed
-    else:
-        body = msg.get_payload(decode=True)
+    # else:
+    #     body = msg.get_payload(decode=True)
     
     # Get the date
     date_str = email.utils.parsedate_to_datetime(msg['date']).strftime('%Y-%m-%d')
     print(f'{i}: {date_str}')
     
     # Store
-    bodies.append((body, date_str))
+    bodies.append((date_str, body_txt, body_html))
 
 bodies.pop(128)  # Accidentally booked a 2-meal box!
+
+# with open('AmendedData\\email.html', "w", encoding="utf-8") as fp:
+#     email_html = body.decode('utf-8')
+#     fp.write(email_html)
+    # soup = BeautifulSoup(email_html, 'html.parser')
+    # soup.find('img', alt='Marmite Teriyaki Tofu With Edamame Rice')
 
 #%% Parse email
 
@@ -61,9 +78,11 @@ def year_swap(d, year):
 body_cleaned = {}
 
 for el in bodies:
-    body = el[0]
-    send_date = el[1]
-    b = body.decode("utf-8")
+    send_date = el[0]
+    body_txt = el[1]
+    body_html = el[2]
+    # Decode the plain-text version, clean up
+    b = body_txt.decode("utf-8")
     b = b.replace('\xad', '')
     b = b.replace('\u00ad', '')
     b = b.replace('\N{SOFT HYPHEN}', '')
@@ -88,7 +107,15 @@ for el in bodies:
         if abs(diff) < 50:
             delivery_date = delivery_option
     # print(send_date, delivery_date.strftime('%Y-%m-%d'))
-    body_cleaned[delivery_date.strftime('%Y-%m-%d')] = b
+    date_str = delivery_date.strftime('%Y-%m-%d')
+    
+    # Decode the HTML version (don't clean yet)
+    h = body_html.decode("utf-8")
+    with open(f'AmendedData\\{date_str}.html', "w", encoding="utf-8") as fp:
+        fp.write(h)
+    
+    body_cleaned[date_str] = {'text': b, 'html': h}
+
 
 #%% Get relevant lines
 
@@ -112,28 +139,56 @@ replacers = {'’': '',
              "Peri-nnaise": "Perinnaise",
              "Meat-free": "Meat-Free"}
 
-for d, b in body_cleaned.items():
-    lines = b.split('\n')
-    # Remove trip hazards
-    for k, v in replacers.items():
-        lines = [s.replace(k, v) for s in lines]
-    title = [s for s in lines if s.istitle()]
-    title = list(set(title))
+for d, dct in body_cleaned.items():
+    # Need to clean them up to be able to detect the titles *only* (to avoid false positives)
+    txt = dct['text']
+    lines = txt.split('\n')
+    selected_lines = {}
+    for i, line in enumerate(lines):
+        # Remove trip hazards
+        clean_line = line
+        for k, v in replacers.items():
+            clean_line = clean_line.replace(k, v)
+        if clean_line.istitle():
+            selected_lines[i] = {'original': line, 'clean': clean_line}
+    # Remove tricks - https://www.geeksforgeeks.org/python-filter-a-list-based-on-the-given-list-of-strings/
     drop_strings = ['Google Play', 'Total: ', 'App Store', '©', 'Inc.',
                     'Box Price', 'Hi Sami', 'Your Gousto Team']
-    # https://www.geeksforgeeks.org/python-filter-a-list-based-on-the-given-list-of-strings/
-    title_clean = [b for b in title if all(a not in b for a in drop_strings)]
-    if len(title_clean) != 4 and len(title_clean) != 5:
-        print(d, title_clean)
+    selected_lines = {k: v for k,v in selected_lines.items() if all(a not in v['clean'] for a in drop_strings)}
+    # print(selected_lines)
+    # This should now be only the title lines - but duplicated still
+    # Take only the titles, dedupe with mapping from unclean to clean
+    name_lines = {}
+    for l in selected_lines.values():
+        name_lines[l['original']] = l['clean']
+    if len(name_lines) != 4 and len(name_lines) != 5:
+        print(d, name_lines.values())
         counter += 1
-    titles[d] = title_clean
+    titles[d] = name_lines
 
 print(f'{counter} weeks with issues')
+
+#%% Get the images
+
+imgs = {}
+
+for d, dct in body_cleaned.items():
+    rich = dct['html']
+    soup = BeautifulSoup(rich, 'html.parser')
+    name_map = titles[d]
+    for original, clean in name_map.items():
+        recip_img = soup.find('img', alt=original)
+        imgs[clean] = recip_img['src']
+
+# Save the list
+with open('AmendedData\\image_locations.csv','w', newline='') as f:
+    w = csv.writer(f)
+    w.writerows(imgs.items())
 
 #%% Make weights using date
 
 # Unweighted list
-mega_list = [t for t_list in titles.values() for t in t_list]
+mega_list = [t for t_dict in titles.values() for t in t_dict.keys()]
 
 # Weighted by frequency
 recipes = dict((k, {'count': mega_list.count(k)}) for k in set(mega_list))
