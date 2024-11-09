@@ -14,6 +14,7 @@ import dateutil.parser as dparser
 import datetime as dt
 from bs4 import BeautifulSoup
 import csv
+import json
 
 #%% Get list off emails
 
@@ -206,6 +207,14 @@ for r in recipes.keys():
 
 recipe_weights = {k: v['distance'] for k, v in recipes.items()}
 
-random.choices(list(recipe_weights.keys()),
-               weights=list(recipe_weights.values()),
-               k=10)
+recipe_list = random.choices(list(recipe_weights.keys()),
+                             weights=list(recipe_weights.values()),
+                             k=3)
+
+# print(recipe_list)
+print('\n'.join([f'- {a}' for a in recipe_list]))
+
+#%% Export data
+
+with open('AmendedData\\recipe_weights.json', 'w', encoding='utf-8') as f:
+    json.dump(recipe_weights, f, ensure_ascii=False, indent=4)
