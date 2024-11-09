@@ -179,7 +179,7 @@ for d, dct in body_cleaned.items():
     name_map = titles[d]
     for original, clean in name_map.items():
         recip_img = soup.find('img', alt=original)
-        imgs[clean] = recip_img['src']
+        imgs[original] = recip_img['src']
 
 # Save the list
 with open('AmendedData\\image_locations.csv','w', newline='') as f:
