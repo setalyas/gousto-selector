@@ -55,7 +55,8 @@ def server(input: Inputs, output: Outputs, session: Session):
                                        size=n_return,
                                        replace=False,
                                        p=weights)
-        img_list = [f"assets/{recipes[t]['img']}" for t in recipe_list]
+        # Hardcode images -- other methods didn't work, IDK why
+        img_list = [f"https://raw.githubusercontent.com/setalyas/gousto-selector/refs/heads/main/docs/assets/{recipes[t]['img']}" for t in recipe_list]
         # recipe_list_str = '\n'.join([f'- {a}' for a in recipe_list])
         # ui.remove_ui(selector="p")
         # ui.remove_ui(selector="ul")

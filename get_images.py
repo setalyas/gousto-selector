@@ -66,7 +66,7 @@ pause_counter = 0
 total_counter = 0
 for i, row in imgs.iterrows():
     # Make new file path
-    fp = f'AmendedData\\imgs\\{row["filename"]}'
+    fp = f'docs\\assets\\{row["filename"]}'
     # Grab file, save locally
     with open(fp, 'wb') as f:
         response = requests.get(row["url"])

@@ -18,5 +18,5 @@ For the Github Pages approach, followed the approach in https://www.appsilon.com
 - Make updates to app. Test locally with `shiny run app.py`
 - `shiny static-assets remove`
 - `shinylive export src_shiny_app docs`
-- Test built correctly with `python -m http.server --directory docs --bind localhost 8008`
+- Test built correctly with `python -m http.server --directory docs --bind localhost 8008` (e.g. images loading correctly)
 - N.B. had to install shinylive via pip => did in a [new environment](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html)
